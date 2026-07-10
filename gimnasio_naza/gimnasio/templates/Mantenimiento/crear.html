@@ -1,0 +1,519 @@
+{% extends 'body.html' %}
+{% load static widget_tweaks %}
+
+{% block contenido %}
+<style>
+    /* ANIMACIONES */
+    .stagger-1, .stagger-2 { animation: revealBounce 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards; opacity: 0; }
+    .stagger-1 { animation-delay: 0.1s; } .stagger-2 { animation-delay: 0.2s; }
+    @keyframes revealBounce { 0% { opacity: 0; transform: translateY(30px) scale(0.97); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+
+    /* COMPONENTES CORE */
+    .card-dash { 
+        position: relative; background: rgba(10, 10, 10, 0.95); backdrop-filter: blur(10px); 
+        border-radius: 15px; box-shadow: 0 15px 35px rgba(0,0,0,0.9); 
+        border: 1px solid rgba(255,215,0,0.1); overflow: hidden; margin-bottom: 25px;
+    }
+    .header-neon { background: rgba(0,0,0,0.5); padding: 25px 35px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    .header-neon h3 { margin: 0; font-weight: 900; font-size: 1.5rem; text-transform: uppercase; color: #fff; letter-spacing: 1px; }
+    .header-neon h3 i { color: #ffd700; }
+
+    /* FORMULARIOS */
+    .form-label-custom { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #a0a0a0; font-weight: 800; margin-bottom: 8px; }
+    .input-dark { background: rgba(0,0,0,0.6) !important; border: 1px solid rgba(255,255,255,0.1) !important; color: #fff !important; border-radius: 6px; padding: 12px 15px; transition: 0.3s; }
+    .input-dark:focus { background: #000 !important; border-color: #ffd700 !important; box-shadow: 0 0 15px rgba(255, 215, 0, 0.3) !important; outline: none; }
+    .input-dark::-webkit-calendar-picker-indicator { filter: invert(1); }
+    
+    .btn-hero-gold { background: #ffd700; color: #000; border: none; font-weight: 900; padding: 12px 25px; font-size: 13px; text-transform: uppercase; box-shadow: 0 0 15px rgba(255,215,0,0.3); transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; transform: skewX(-10deg); text-decoration: none; }
+    .btn-hero-gold span { transform: skewX(10deg); display: block; }
+    .btn-hero-gold:hover { transform: skewX(-10deg) scale(1.05); box-shadow: 0 0 25px #ffd700; background: #fff; color: #000; }
+
+    /* MODALES Y ALERTAS */
+    .modal-dark .modal-content { background: #0a0a0a; border: 1px solid #ffd700; color: #fff; box-shadow: 0 0 50px rgba(0,0,0,0.9); }
+    .alert-amber { background: rgba(255, 215, 0, 0.05); border-left: 4px solid #ffd700; border-radius: 8px; padding: 20px; border: 1px solid rgba(255,215,0,0.1); }
+    .btn-add-cat { background: rgba(255, 215, 0, 0.1); color: #ffd700; border: 1px solid #ffd700; padding: 12px 14px; border-radius: 6px; transition: 0.3s; }
+    .btn-add-cat:hover { background: #ffd700; color: #000; box-shadow: 0 0 15px rgba(255,215,0,0.4); }
+
+    /* Z-INDEX PARA MODALES APILADOS */
+    #modalCategoria, #modalCategoria.show { z-index: 9999 !important; }
+    .backdrop-cat.show { z-index: 9998 !important; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); }
+    #modalCategoria .modal-dialog { z-index: 10000 !important; }
+</style>
+
+<div class="container mt-4" style="max-width: 800px;">
+    <form method="POST" action="." enctype="multipart/form-data" class="card-dash stagger-1" id="mantenimientoForm">
+        {% csrf_token %}
+        <div class="header-neon"><h3><i class="ri-tools-fill"></i> {{ titulo }}</h3></div>
+        <div class="card-body p-4 p-md-5" style="position: relative; z-index: 2;">
+            {% if form.errors %}
+            <div class="alert mb-4" style="background: rgba(255,77,79,0.1); border: 1px solid #ff4d4f; color: #fff;">
+                <h6 class="fw-bold" style="color: #ff4d4f;"><i class="ri-error-warning-line me-2"></i> Verifica los campos.</h6>
+                <ul class="mb-0 small">{% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}</ul>
+            </div>
+        </div>
+        {% endif %}
+
+        {% for field in form.visible_fields %}
+        <div class="form-group mb-4 stagger-2">
+            <label class="form-label-custom">
+                {% if field.name == 'nombre_elemento' %} Equipo Asociado {% else %} {{ field.label }} {% endif %}
+            </label>
+
+            {% if field.name == 'nombre_elemento' %}
+            <div class="d-flex align-items-center gap-2">
+                {{ field|add_class:'form-select input-dark' }}
+                <button type="button"
+                        class="btn"
+                        style="background: rgba(255,215,0,.1);
+                              color:#ffd700;
+                              border:1px solid #ffd700;
+                              padding:12px 18px;
+                              border-radius:6px;"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalWizard">
+                    <i class="ri-add-line"></i>
+                </button>
+            </div>
+            {% else %}
+                {{ field|add_class:'form-control input-dark' }}
+            {% endif %}
+        </div>
+        {% endfor %}
+        {% if elemento_pre %}
+            <div class="alert-amber mb-4 stagger-2">
+                <h6 class="fw-bold text-uppercase mb-3" style="color: #ffd700; font-size: 12px;"><i class="ri-information-line me-1"></i> Equipo Seleccionado</h6>
+                <div class="row small">
+                    <div class="col-md-3"> <small class="text-muted d-block fw-bold">Elemento</small> <strong class="text-white">{{ elemento_pre.nombre_elemento }}</strong> </div>
+                    <div class="col-md-3"> <small class="text-muted d-block fw-bold">Serial</small> <strong class="text-white">{{ elemento_pre.serial }}</strong> </div>
+                    <div class="col-md-3"> <small class="text-muted d-block fw-bold">Peso</small> <strong class="text-white">{{ elemento_pre.peso_elemento }} {{ elemento_pre.unidad_peso }}</strong> </div>
+                    <div class="col-md-3"> <small class="text-muted d-block fw-bold">Categoría</small> <strong class="text-white">{{ elemento_pre.nombre_categoria.get_nombre_categoria_display }}</strong> </div>
+                </div>
+            </div>
+            {% endif %}
+    </div>
+
+    <div class="card-footer border-0 p-4 p-md-5 pt-0 d-flex gap-3" style="background: transparent; position: relative; z-index: 2;">
+        <button type="submit" class="btn-hero-gold"><span><i class="ri-save-line me-1"></i> Guardar</span></button>
+        <a href="{% url 'gimnasio:listar_mantenimiento' %}" class="btn fw-bold px-4 py-2" style="background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.2); text-transform: uppercase; font-size: 13px; transform: skewX(-10deg); display: inline-flex; text-decoration: none;">
+            <span style="transform: skewX(10deg);"><i class="ri-close-line me-1"></i> Cancelar</span>
+        </a>
+    </div>
+  </form>
+      <div class="modal fade" id="modalWizard" tabindex="-1">
+      <div class="modal-dialog modal-xl modal-dialog-centered">
+          <div class="modal-content modal-dark">
+
+              <div class="modal-header">
+                  <h5 class="modal-title">
+                      <i class="ri-add-circle-line text-warning"></i>
+                      Registrar nuevo equipo
+                  </h5>
+
+                  <button class="btn-close btn-close-white"
+                          data-bs-dismiss="modal"></button>
+              </div>
+
+              <div class="modal-body">
+
+                  <div class="d-flex justify-content-center mb-4">
+
+                      <div class="wizard-indicator active mx-2">
+                          1️⃣ Categoría
+                      </div>
+
+                      <div class="wizard-indicator mx-2">
+                          2️⃣ Elemento
+                      </div>
+
+                  </div>
+
+                  <!-- PASO 1 -->
+                    <div id="step1" class="wizard-step">
+
+                        <h5 class="text-warning mb-4">
+                            Paso 1 - Crear categoría
+                        </h5>
+
+                        <div class="mb-3">
+                            <label class="form-label-custom">
+                                Nombre de la categoría
+                            </label>
+
+                            <input
+                                type="text"
+                                id="nombreCategoria"
+                                class="form-control input-dark"
+                                placeholder="Ingrese el nombre de la categoría">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label-custom">
+                                Descripción
+                            </label>
+
+                            <textarea
+                                id="descripcionCategoria"
+                                rows="4"
+                                class="form-control input-dark"
+                                placeholder="Descripción de la categoría"></textarea>
+                        </div>
+
+                    </div>
+
+                  <!-- PASO 2 -->
+                  <div id="step2" class="wizard-step" style="display:none;">
+
+                      <h5 class="text-warning mb-4">
+                          Paso 2 - Datos del equipo
+                      </h5>
+
+                      <div class="row">
+
+                          <div class="col-md-6 mb-3">
+                              <label class="form-label-custom">Serial</label>
+                              <input type="text" id="serial" class="form-control input-dark">
+                          </div>
+
+                          <div class="col-md-6 mb-3">
+                              <label class="form-label-custom">Marca</label>
+                              <input type="text" id="marca" class="form-control input-dark">
+                          </div>
+
+                          <div class="col-md-6 mb-3">
+                              <label class="form-label-custom">Nombre del elemento</label>
+                              <input type="text" id="nombre" class="form-control input-dark">
+                          </div>
+
+                          <div class="col-md-6 mb-3">
+                              <label class="form-label-custom">Peso</label>
+                              <input type="number" step="0.01" id="peso" class="form-control input-dark">
+                          </div>
+
+                          <div class="col-md-6 mb-3">
+                                <label class="form-label-custom">Unidad de peso</label>
+
+                                <select id="unidad_peso" class="form-select input-dark">
+                                    <option value="kg">kg</option>
+                                    <option value="lb">lb</option>
+                                </select>
+                            </div>
+
+                          <div class="col-md-6 mb-3">
+                              <label class="form-label-custom">Estado</label>
+                              <select id="estado" class="form-select input-dark">
+                                  <option value="activo">Activo</option>
+                                  <option value="inactivo">Inactivo</option>
+                              </select>
+                          </div>
+
+                          <div class="col-md-6 mb-3">
+                                <label class="form-label-custom">
+                                    Fecha de compra
+                                </label>
+
+                                <input
+                                    type="date"
+                                    id="fecha_compra"
+                                    class="form-control input-dark">
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label-custom">
+                                    Categoría creada
+                                </label>
+
+                                <input
+                                    type="text"
+                                    id="categoriaCreada"
+                                    class="form-control input-dark"
+                                    readonly>
+                            </div>
+
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label-custom">
+                                    Cantidad
+                                </label>
+
+                                <input
+                                    type="number"
+                                    id="cantidad"
+                                    class="form-control input-dark"
+                                    value="1"
+                                    min="1">
+                            </div>
+
+                          <div class="col-12 mb-3">
+                              <label class="form-label-custom">Imagen</label>
+                              <input type="file" id="foto" class="form-control input-dark">
+                          </div>
+
+                      </div>
+
+                  </div>
+                      <div class="modal-footer">
+
+                        <button
+                            type="button"
+                            class="btn btn-secondary"
+                            id="btnAnterior"
+                            style="display:none;">
+                            Anterior
+                        </button>
+
+                        <button
+                            type="button"
+                            class="btn btn-warning"
+                            id="btnSiguiente">
+                            Siguiente
+                        </button>
+
+                        <button
+                            type="button"
+                            class="btn btn-success"
+                            id="btnGuardarElemento"
+                            style="display:none;">
+                            Guardar Equipo
+                        </button>
+
+                    </div>
+              </div>
+          </div>
+
+                  
+      </div>
+  </div>
+
+</div>
+
+
+{% endblock %}
+
+{% block js %}
+<script src="{% static 'js/validation.js' %}"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    let paso = 1;
+    let categoriaCreada = null;
+
+    const btnSiguiente = document.getElementById("btnSiguiente");
+    const btnAnterior = document.getElementById("btnAnterior");
+    const btnGuardarElemento = document.getElementById("btnGuardarElemento");
+
+    const txtNombreCategoria = document.getElementById("nombreCategoria");
+    const txtDescripcionCategoria = document.getElementById("descripcionCategoria");
+    const txtCategoriaCreada = document.getElementById("categoriaCreada");
+    const txtSerial = document.getElementById("serial");
+    const txtMarca = document.getElementById("marca");
+    const txtNombre = document.getElementById("nombre");
+    const txtPeso = document.getElementById("peso");
+    const txtUnidad = document.getElementById("unidad_peso");
+    const txtEstado = document.getElementById("estado");
+    const txtFecha = document.getElementById("fecha_compra");
+    const txtCantidad = document.getElementById("cantidad");
+    const txtFoto = document.getElementById("foto");
+
+    if (!btnSiguiente) return;
+
+    function mostrarPaso(numero){
+
+        document.querySelectorAll(".wizard-step").forEach(step=>{
+            step.style.display="none";
+        });
+
+        document.getElementById("step"+numero).style.display="block";
+
+        paso = numero;
+
+        // Botón anterior
+        btnAnterior.style.display = (paso === 1) ? "none" : "inline-block";
+
+        // Solo existen 2 pasos
+        if(paso === 1){
+
+            btnSiguiente.style.display = "inline-block";
+            btnGuardarElemento.style.display = "none";
+
+        }else{
+
+            btnSiguiente.style.display = "none";
+            btnGuardarElemento.style.display = "inline-block";
+
+        }
+
+        document.querySelectorAll(".wizard-indicator").forEach((item,index)=>{
+
+            if(index + 1 <= paso){
+
+                item.classList.add("active");
+
+            }else{
+
+                item.classList.remove("active");
+
+            }
+
+        });
+
+    }
+
+    btnSiguiente.addEventListener("click", function () {
+
+        if (paso !== 1) return;
+
+        if (
+            txtNombreCategoria.value.trim() === "" ||
+            txtDescripcionCategoria.value.trim() === ""
+        ) {
+
+            Swal.fire({
+                icon: "warning",
+                title: "Campos obligatorios",
+                text: "Debe ingresar el nombre y la descripción de la categoría."
+            });
+
+            return;
+        }
+
+        fetch("{% url 'gimnasio:crear_categoria_ajax' %}", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+            },
+
+            body: JSON.stringify({
+
+                nombre_categoria: txtNombreCategoria.value,
+                descripcion: txtDescripcionCategoria.value
+
+            })
+
+        })
+
+        .then(response => response.json())
+
+        .then(data => {
+
+            if (data.error) {
+
+                Swal.fire({
+                    icon: "error",
+                    title: "Error",
+                    text: data.error
+                });
+
+                return;
+            }
+
+            categoriaCreada = data.id;
+
+            txtCategoriaCreada.value = data.nombre;
+
+            mostrarPaso(2);
+
+        })
+
+        .catch(error => {
+
+            console.error(error);
+
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: "No fue posible crear la categoría."
+            });
+
+        });
+
+    });
+
+    btnAnterior.addEventListener("click",function(){
+
+        if(paso === 2){
+
+            mostrarPaso(1);
+
+        }
+
+    });
+    btnGuardarElemento.addEventListener("click", function () {
+
+    let datos = new FormData();
+
+    datos.append("serial", txtSerial.value);
+    datos.append("marca", txtMarca.value);
+    datos.append("nombre", txtNombre.value);
+    datos.append("peso", txtPeso.value);
+    datos.append("unidad_peso", txtUnidad.value);
+    datos.append("estado", txtEstado.value);
+    datos.append("fecha_compra", txtFecha.value);
+    datos.append("categoria", categoriaCreada);
+    datos.append("cantidad", txtCantidad.value);
+
+    if (txtFoto.files.length > 0) {
+        datos.append("foto", txtFoto.files[0]);
+    }
+
+    fetch("{% url 'gimnasio:crear_elemento_ajax' %}", {
+
+        method: "POST",
+
+        headers: {
+            "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+        },
+
+        body: datos
+
+    })
+
+    .then(response => response.json())
+
+    .then(data => {
+
+        console.log("Respuesta del servidor:", data);
+
+        if (data.error) {
+
+            console.error(data.error);
+
+            Swal.fire({
+                icon: "error",
+                title: "Error",
+                text: data.error
+            });
+
+            return;
+
+        }
+
+        Swal.fire({
+            icon: "success",
+            title: "Equipo creado correctamente",
+            text: data.nombre
+        });
+
+    })
+
+    .catch(error => {
+
+        console.error(error);
+
+        Swal.fire({
+            icon: "error",
+            title: "Error",
+            text: "No fue posible crear el equipo."
+        });
+
+    });
+
+});
+    mostrarPaso(1);
+
+});
+</script>
+{% endblock %}
